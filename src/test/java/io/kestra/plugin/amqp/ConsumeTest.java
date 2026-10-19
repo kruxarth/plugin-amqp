@@ -6,6 +6,8 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
@@ -235,6 +237,55 @@ class ConsumeTest extends AbstractTest {
         assertThat(output, is(notNullValue()));
         assertThat(output.getCount(), equalTo(0));
         assertThat(elapsed.toMillis(), lessThan(400L));
+    }
+
+    @Test
+    void shouldKeepConsumingUntilMaxDurationWhenLongerThanOneMinute() throws Exception {
+        var queueName = "long-duration-queue-" + IdUtils.create();
+        CreateQueue.builder()
+            .host(Property.ofValue("localhost"))
+            .port(Property.ofValue("5672"))
+            .username(Property.ofValue("guest"))
+            .password(Property.ofValue("guest"))
+            .virtualHost(Property.ofValue("/my_vhost"))
+            .name(Property.ofValue(queueName))
+            .build()
+            .run(runContextFactory.of());
+
+        var consume = Consume.builder()
+            .id("consumeLongDuration-" + IdUtils.create())
+            .type(Consume.class.getName())
+            .host(Property.ofValue("localhost"))
+            .port(Property.ofValue("5672"))
+            .username(Property.ofValue("guest"))
+            .password(Property.ofValue("guest"))
+            .virtualHost(Property.ofValue("/my_vhost"))
+            .queue(Property.ofValue(queueName))
+            .consumerTag(Property.ofValue("KestraConsumeTest-" + IdUtils.create()))
+            .serdeType(Property.ofValue(SerdeType.STRING))
+            .maxRecords(Property.ofValue(1))
+            .maxDuration(Property.ofValue(Duration.ofSeconds(75)))
+            .build();
+
+        try (
+            var connection = consume.connectionFactory(runContextFactory.of()).newConnection();
+            var scheduler = Executors.newSingleThreadScheduledExecutor()
+        ) {
+            var channel = connection.createChannel();
+            scheduler.schedule(
+                () ->
+                {
+                    channel.basicPublish("", queueName, null, "late".getBytes());
+                    return null;
+                },
+                62,
+                TimeUnit.SECONDS
+            );
+
+            var output = consume.run(runContextFactory.of());
+
+            assertThat(output.getCount(), equalTo(1));
+        }
     }
 
     private void waitForSecondStartWindow() throws InterruptedException {

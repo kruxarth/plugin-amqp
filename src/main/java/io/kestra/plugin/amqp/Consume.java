@@ -165,7 +165,8 @@ public class Consume extends AbstractAmqpConnection implements RunnableTask<Cons
                     FileSerde.write(outputFile, message);
                     total.getAndIncrement();
                 }),
-                () -> this.ended(total, started, rMaxRecords, rMaxDuration)
+                () -> this.ended(total, started, rMaxRecords, rMaxDuration),
+                rMaxDuration
             )
         ) {
             this.runningThread.set(thread);
@@ -229,6 +230,7 @@ public class Consume extends AbstractAmqpConnection implements RunnableTask<Cons
         private final AtomicReference<Long> lastDeliveryTag = new AtomicReference<>();
         private final AtomicReference<Exception> exception = new AtomicReference<>();
         private final Supplier<Boolean> endSupplier;
+        private final Duration maxDuration;
 
         private final ConnectionFactory factory;
         private final RunContext runContext;
@@ -248,7 +250,8 @@ public class Consume extends AbstractAmqpConnection implements RunnableTask<Cons
             ConsumeBaseInterface consumeInterface,
             boolean autoAck,
             Consumer<Message> consumer,
-            Supplier<Boolean> supplier) {
+            Supplier<Boolean> supplier,
+            Duration maxDuration) {
             super("amqp-consume");
             this.setDaemon(true);
             this.factory = factory;
@@ -257,6 +260,7 @@ public class Consume extends AbstractAmqpConnection implements RunnableTask<Cons
             this.autoAck = autoAck;
             this.consumer = consumer;
             this.endSupplier = supplier;
+            this.maxDuration = maxDuration;
         }
 
         public Exception getException() {
@@ -379,7 +383,7 @@ public class Consume extends AbstractAmqpConnection implements RunnableTask<Cons
                         Await.until(
                             () -> exception.get() != null || endSupplier.get(),
                             Duration.ofMillis(100),
-                            Duration.ofMinutes(1)
+                            maxDuration != null ? maxDuration : Duration.ofMinutes(1)
                         );
                     }
                 } catch (TimeoutException e) {

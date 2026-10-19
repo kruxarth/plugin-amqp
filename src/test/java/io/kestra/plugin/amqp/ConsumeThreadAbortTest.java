@@ -39,7 +39,8 @@ class ConsumeThreadAbortTest {
             null,
             false,
             message -> {},
-            () -> true
+            () -> true,
+            null
         );
 
         var connectionField = Consume.ConsumeThread.class.getDeclaredField("connection");
