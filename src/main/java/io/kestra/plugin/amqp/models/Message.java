@@ -2,8 +2,8 @@ package io.kestra.plugin.amqp.models;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import com.rabbitmq.client.BasicProperties;
 import com.rabbitmq.client.Envelope;
@@ -70,12 +70,7 @@ public class Message implements io.kestra.core.models.tasks.Output {
             .data(serdeType.deserialize(message))
             .contentType(properties.getContentType())
             .contentEncoding(properties.getContentEncoding())
-            .headers(
-                properties.getHeaders() != null ? properties.getHeaders()
-                    .entrySet()
-                    .stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, String::valueOf)) : null
-            )
+            .headers(headers(properties.getHeaders()))
             .deliveryMode(properties.getDeliveryMode())
             .priority(properties.getPriority())
             .messageId(properties.getMessageId())
@@ -88,5 +83,15 @@ public class Message implements io.kestra.core.models.tasks.Output {
             .appId(properties.getAppId())
             .routingKey(envelope != null ? envelope.getRoutingKey() : null)
             .build();
+    }
+
+    private static Map<String, Object> headers(Map<String, Object> headers) {
+        if (headers == null) {
+            return null;
+        }
+
+        var normalized = new LinkedHashMap<String, Object>();
+        headers.forEach((key, value) -> normalized.put(key, Amqp1Message.normalize(value)));
+        return normalized;
     }
 }

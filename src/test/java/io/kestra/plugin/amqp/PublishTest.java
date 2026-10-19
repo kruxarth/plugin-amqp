@@ -126,7 +126,7 @@ class PublishTest extends AbstractTest {
 
             var headers = received.getFirst().getHeaders();
             assertThat(headers, is(notNullValue()));
-            assertThat(headers.get("testHeader").toString(), containsString("PublishTest"));
+            assertThat(headers.get("testHeader"), is("PublishTest"));
         }
     }
 }
